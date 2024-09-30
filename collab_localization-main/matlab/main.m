@@ -1,13 +1,16 @@
 clear; clc; close all
 rng(42)
 
+warning('off', 'all');
+
+
 addpath('algorithms');
 addpath('input');
 addpath('output');
 addpath('src');
 %%
 nSims = 10^3;
-runtime = 1;
+runtime = 5;
 SF = -0;
 sve = false;
 

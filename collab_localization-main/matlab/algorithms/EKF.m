@@ -92,31 +92,28 @@ else
     if mod(t, rate/rate_mdl) == 0 && sensors(1)
 
         z_vel = x_truth(4,:,t) + normrnd(0, enc_err, [1, nCars, nSims]);
-        z_del = x_truth(5,:,t) + normrnd(0, sa_err, [1, nCars, nSims]);
+        z_del = del(t,:) + normrnd(0, sa_err, [1, nCars, nSims]);
         
         z = [   z_vel;...
-                z_vel.*tan(z_del) / wb
-                z_del];
+                z_vel.*tan(z_del) / wb];
 
         kf_vel = sqrt( EKF_x(4,:,:,t).^2 + EKF_x(5,:,:,t).^2 );
-        H = zeros(3,7,nCars,nSims);
+        H = zeros(2,7,nCars,nSims);
         H(1,4,:,:) = EKF_x(4,:,:,t) ./ kf_vel;
         H(1,5,:,:) = EKF_x(5,:,:,t) ./ kf_vel;
         H(2,4,:,:) = tan(EKF_x(7,:,:,t))/wb;
         dtan = ( sec(EKF_x(7,:,:,t)) ).^2;
         H(2,7,:,:) = EKF_x(4,:,:,t).*(dtan);
-        H(3,7,:,:) = 1;
         
-        h = [kf_vel; EKF_x(6:7,:,:,t)];
+        h = [kf_vel; EKF_x(6,:,:,t)];
 
         R = zeros(2,2,nCars,nSims);
         R(1,1,:,:) = enc_err*enc_err;
         R(2,2,:,:) = imu_mag_err*imu_mag_err;
 
-        M = zeros(3,2,nCars,nSims);
+        M = zeros(2,2,nCars,nSims);
         M(1,1,:,:) = 1;
         M(2,2,:,:) = EKF_x(4,:,:,t) .* dtan;
-        M(3,2,:,:) = 1;
 
         
         
@@ -124,7 +121,7 @@ else
             pagemtimes(M ,pagemtimes(R,'none',M,'transpose')) ));
 
         EKF_x(:,:,:,t) = EKF_x(:,:,:,t) + reshape( pagemtimes( K, reshape((z-h), [2, 1, nCars, nSims])), [7, nCars, nSims]);
-        EKF_P = pagemtimes( (repmat(eye(6), [1,1,nCars,nSims]) - pagemtimes(K,H)), EKF_P);
+        EKF_P = pagemtimes( (repmat(eye(7), [1,1,nCars,nSims]) - pagemtimes(K,H)), EKF_P);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
              for j2 = 1 : nSims
                 for j1 = 1 : nCars
@@ -135,7 +132,7 @@ else
                 end
              end
    %%%%%%%%%%%%%%%%%%%%%%%%% 
-        clear z_vel z_del z kf_vel H h R K
+        clear z_vel z_del z kf_vel H h R K M
     end
 
     % GPS step at 10 Hz

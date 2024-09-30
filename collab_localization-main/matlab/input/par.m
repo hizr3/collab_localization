@@ -60,8 +60,7 @@ if easy
         % Straight line default
         acc = ones(nTicks, nCars);
         del = zeros(nTicks, nCars);
-        size(acc)
-        size(del)
+
 else
     % Very hard trajectory
     acc = randi([0 , 70] ,nTicks,nCars)+normrnd(0,1,nTicks,nCars);
@@ -73,7 +72,5 @@ else
                     del(i,:) = cos(i*dt*2*pi*0.3);
                 end
             end
-    size(acc)
-    size(del)
-
+ 
 end
