@@ -68,8 +68,8 @@ else
     % Pacmod Step at 30 Hz
     if mod(t, rate/rate_mdl) == 0 && sensors(1)
 
-        z_vel = x_truth(4,:,t) + normrnd(0, enc_err, [1, nCars, nSims]);
-        z_del = del(t,:) + normrnd(0, imu_mag_err, [1, nCars, nSims]);
+        z_vel = x_truth(4,:,t) + normrnd(0, enc_err, [1, nCars, nSims]); % steering angle
+        z_del = del(t,:) + normrnd(0, imu_mag_err, [1, nCars, nSims]);   % steering angle RATE !!
         
         z = [   z_vel;...
                 z_vel.*tan(z_del) / wb ];
@@ -77,22 +77,30 @@ else
         kf_vel = sqrt( EKF_x(4,:,:,t).^2 + EKF_x(5,:,:,t).^2 );
         
         H = zeros(2,6,nCars,nSims);
-        H(1,4,:,:) = EKF_x(4,:,:,t) ./ kf_vel;
-        H(1,5,:,:) = EKF_x(5,:,:,t) ./ kf_vel;
-        H(2,6,:,:) = 1;
-        
+        H(1,4,:,:) = -EKF_x(4,:,:,t) ./ kf_vel;
+        H(1,5,:,:) = -EKF_x(5,:,:,t) ./ kf_vel;
+        H(2,4,:,:) = ( -EKF_x(4,:,:,t) ./ kf_vel ) .* tan(EKF_x(6,:,:,t));
+        H(2,5,:,:) = ( -EKF_x(5,:,:,t) ./ kf_vel ) .* tan(EKF_x(6,:,:,t));
+        dtan = (sec(EKF_x(6,:,:,t))).^2;
+        % H(2,6,:,:) = kf_vel .* dtan;
+   
         h = [kf_vel; EKF_x(6,:,:,t)];
 
         R = zeros(2,2,nCars,nSims);
-        R(1,1,:,:) = enc_err;
-        R(2,2,:,:) = str_err * z_vel / wb;
-
-        K = pageDiv( pagemtimes(EKF_P,'none',H,'transpose'), (pagemtimes( pagemtimes(H,EKF_P), 'none', H, 'transpose') + R));
+        R(1,1,:,:) = enc_err*enc_err;
+        R(2,2,:,:) = imu_mag_err*imu_mag_err;
+        
+        Mk = eye(2);
+        Mk = repmat(Mk , [1,1,nCars,nSims] );
+        % Mk(1,1,:,:) = 1;
+        % Mk(2,1,:,:) = tan(EKF_x(6,:,:,t)) / wb;
+        
+        K = pageDiv( pagemtimes(EKF_P,'none',H,'transpose')        ,           ( pagemtimes( Mk ,pagemtimes(R,'none',Mk,'transpose') ) + pagemtimes( pagemtimes(H,EKF_P), 'none', H, 'transpose'))            );
 
         EKF_x(:,:,:,t) = EKF_x(:,:,:,t) + reshape( pagemtimes( K, reshape((z-h), [2, 1, nCars, nSims])), [6, nCars, nSims]);
         EKF_P = pagemtimes( (repmat(eye(6), [1,1,nCars,nSims]) - pagemtimes(K,H)), EKF_P);
 
-        clear z_vel z_del z kf_vel H h R K
+        clear z_vel z_del z kf_vel H h R K Mk dtan
     end
 
     % GPS step at 10 Hz
