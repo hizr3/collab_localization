@@ -1,17 +1,18 @@
 if t == 1
     
-    EKF_x = zeros(6, nCars, nSims, nTicks);
+    EKF_x = zeros(7, nCars, nSims, nTicks);
     EKF_x(1:3,:,:,t) = repmat(x_truth(1:3,:,t), [1,1,nSims]);
     EKF_x(4,:,:,t)   = repmat(-sin(x_truth(3,:,t)) .* x_truth(4,:,t), [1,1,nSims]);
     EKF_x(5,:,:,t)   = repmat( cos(x_truth(3,:,t)) .* x_truth(4,:,t), [1,1,nSims]);
-    
+
     EKF_P = repmat(... 
             diag([  imu_acc_err*imu_acc_err / 2 / rate_imu^2    ;...
                     imu_acc_err*imu_acc_err/ 2 / rate_imu^2    ;...
                     imu_gyr_err*imu_gyr_err/ rate_imu          ;...
                     imu_acc_err*imu_acc_err / rate_imu          ;...
                     imu_acc_err*imu_acc_err / rate_imu          ;...
-                    imu_gyr_err*imu_gyr_err]), [1,1,nCars,nSims]);
+                    imu_gyr_err*imu_gyr_err ; ...
+                    sa_err*sa_err]), [1,1,nCars,nSims]);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
              for j2 = 1 : nSims
                 for j1 = 1 : nCars
@@ -31,9 +32,9 @@ else
             + normrnd(0, imu_acc_err, [2, nCars, nSims]);
         
         gyro = x_truth(4,:,t) .* tan(del(t,:)) / wb ...
-            + normrnd(0, imu_gyr_err, [1, nCars, nSims]);
+            + normrnd(0, imu_gyr_err, [1, nCars, nSims]); % v*tan*(delta)/wb is the vehicle angular rate in the bycicle mode, which is what is being measured by the gyro
         
-        mag = x_truth(3,:,t) ...
+        mag = x_truth(3,:,t) ...  
             + normrnd(0, imu_mag_err, [1, nCars, nSims]);
         
         theta = EKF_x(3,:,:,t);
@@ -48,7 +49,8 @@ else
            (EKF_x(3,:,:,t-1) + gyro * dt) * 0.98 + 0.02 * mag;...
             EKF_x(4,:,:,t-1) + accel_r(1,:,:) * dt;...
             EKF_x(5,:,:,t-1) + accel_r(2,:,:) * dt;...
-            gyro];
+            gyro
+            EKF_x(7,:,:,t-1)];
 
         
         Q = diag([  imu_acc_err*imu_acc_err / 2 / rate_imu^2    ;...
@@ -56,15 +58,17 @@ else
                     imu_gyr_err*imu_gyr_err / rate_imu          ;...
                     imu_acc_err*imu_acc_err / rate_imu          ;...
                     imu_acc_err*imu_acc_err / rate_imu          ;...
-                    imu_gyr_err*imu_gyr_err]);
+                    imu_gyr_err*imu_gyr_err; ...
+                    sa_err*sa_err]);
 
 
-        F = [   1,  0,  0, dt,  0,  0  ;...
-                0,  1,  0,  0, dt,  0  ;...
-                0,  0,  1,  0,  0, dt  ;...
-                0,  0,  0,  1,  0,  0  ;...
-                0,  0,  0,  0,  1,  0  ;...
-                0,  0,  0,  0,  0,  1 ];
+        F = [   1,  0,  0, dt,  0,  0  ,0;...
+                0,  1,  0,  0, dt,  0  ,0;...
+                0,  0,  1,  0,  0, dt  ,0;...
+                0,  0,  0,  1,  0,  0  ,0;...
+                0,  0,  0,  0,  1,  0  ,0;...
+                0,  0,  0,  0,  0,  1 , 0;...
+                0 , 0,  0,  0,  0,  0,  1;];
             
         EKF_P = pagemtimes(...
                     pagemtimes(...
@@ -88,27 +92,38 @@ else
     if mod(t, rate/rate_mdl) == 0 && sensors(1)
 
         z_vel = x_truth(4,:,t) + normrnd(0, enc_err, [1, nCars, nSims]);
-        z_del = del(t,:) + normrnd(0, imu_mag_err, [1, nCars, nSims]);
+        z_del = x_truth(5,:,t) + normrnd(0, sa_err, [1, nCars, nSims]);
         
         z = [   z_vel;...
-                z_vel.*tan(z_del) / wb ];
+                z_vel.*tan(z_del) / wb
+                z_del];
 
         kf_vel = sqrt( EKF_x(4,:,:,t).^2 + EKF_x(5,:,:,t).^2 );
-        
-        H = zeros(2,6,nCars,nSims);
+        H = zeros(3,7,nCars,nSims);
         H(1,4,:,:) = EKF_x(4,:,:,t) ./ kf_vel;
         H(1,5,:,:) = EKF_x(5,:,:,t) ./ kf_vel;
-        H(2,6,:,:) = 1;
+        H(2,4,:,:) = tan(EKF_x(7,:,:,t))/wb;
+        dtan = ( sec(EKF_x(7,:,:,t)) ).^2;
+        H(2,7,:,:) = EKF_x(4,:,:,t).*(dtan);
+        H(3,7,:,:) = 1;
         
-        h = [kf_vel; EKF_x(6,:,:,t)];
+        h = [kf_vel; EKF_x(6:7,:,:,t)];
 
         R = zeros(2,2,nCars,nSims);
         R(1,1,:,:) = enc_err*enc_err;
         R(2,2,:,:) = imu_mag_err*imu_mag_err;
-        
-        K = pageDiv( pagemtimes(EKF_P,'none',H,'transpose'), (pagemtimes( pagemtimes(H,EKF_P), 'none', H, 'transpose') + R));
 
-        EKF_x(:,:,:,t) = EKF_x(:,:,:,t) + reshape( pagemtimes( K, reshape((z-h), [2, 1, nCars, nSims])), [6, nCars, nSims]);
+        M = zeros(3,2,nCars,nSims);
+        M(1,1,:,:) = 1;
+        M(2,2,:,:) = EKF_x(4,:,:,t) .* dtan;
+        M(3,2,:,:) = 1;
+
+        
+        
+        K = pageDiv( pagemtimes(EKF_P,'none',H,'transpose'), (pagemtimes( pagemtimes(H,EKF_P), 'none', H, 'transpose') + ...
+            pagemtimes(M ,pagemtimes(R,'none',M,'transpose')) ));
+
+        EKF_x(:,:,:,t) = EKF_x(:,:,:,t) + reshape( pagemtimes( K, reshape((z-h), [2, 1, nCars, nSims])), [7, nCars, nSims]);
         EKF_P = pagemtimes( (repmat(eye(6), [1,1,nCars,nSims]) - pagemtimes(K,H)), EKF_P);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
              for j2 = 1 : nSims
@@ -135,7 +150,7 @@ else
 
         kf_vel = sqrt( EKF_x(4,:,:,t).^2 + EKF_x(5,:,:,t).^2 );
         
-        H = zeros(4,6,nCars,nSims);
+        H = zeros(4,7,nCars,nSims);
         H(1,1,:,:) = 1;
         H(2,2,:,:) = 1;
         H(3,3,:,:) = 1;
@@ -154,8 +169,8 @@ else
 
         K = pageDiv( pagemtimes(EKF_P,'none',H,'transpose'), ( pagemtimes( pagemtimes( H, EKF_P), 'none', H, 'transpose') + R ) );
 
-        EKF_x(:,:,:,t) = EKF_x(:,:,:,t) + reshape( pagemtimes( K, reshape(z - h, [4, 1, nCars, nSims])), [6, nCars, nSims] );
-        EKF_P = pagemtimes( ( repmat( eye(6), [1,1,nCars,nSims] ) - pagemtimes(K,H) ), EKF_P );
+        EKF_x(:,:,:,t) = EKF_x(:,:,:,t) + reshape( pagemtimes( K, reshape(z - h, [4, 1, nCars, nSims])), [7, nCars, nSims] );
+        EKF_P = pagemtimes( ( repmat( eye(7), [1,1,nCars,nSims] ) - pagemtimes(K,H) ), EKF_P );
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
              for j2 = 1 : nSims
                 for j1 = 1 : nCars
