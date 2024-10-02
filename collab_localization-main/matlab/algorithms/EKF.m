@@ -2,8 +2,8 @@ if t == 1
     
     EKF_x = zeros(7, nCars, nSims, nTicks);
     EKF_x(1:3,:,:,t) = repmat(x_truth(1:3,:,t), [1,1,nSims]);
-    EKF_x(4,:,:,t)   = repmat(-sin(x_truth(3,:,t)) .* x_truth(4,:,t), [1,1,nSims]);
-    EKF_x(5,:,:,t)   = repmat( cos(x_truth(3,:,t)) .* x_truth(4,:,t), [1,1,nSims]);
+    EKF_x(4,:,:,t)   = repmat(cos(x_truth(3,:,t)) .* x_truth(4,:,t), [1,1,nSims]);
+    EKF_x(5,:,:,t)   = repmat(sin(x_truth(3,:,t)) .* x_truth(4,:,t), [1,1,nSims]);
 
     EKF_P = repmat(... 
             diag([  imu_acc_err*imu_acc_err / 2 / rate_imu^2    ;...
@@ -24,24 +24,43 @@ if t == 1
              end
    %%%%%%%%%%%%%%%%%%%%%%%%%       
 else
-    
+
     % Predict Step at 400 Hz
-    if mod(t, rate/rate_imu) == 0
-        
-        accel = [acc(t,:); x_truth(4,:,t).^2 / wb.* tan(del(t,:))] ...
+    if mod(t, rate/rate_imu) ==  0 
+
+
+       accel = [acc(t,:); x_truth(4,:,t).^2 / wb.* tan(del(t,:))] ...
             + normrnd(0, imu_acc_err, [2, nCars, nSims]);
+
+        omegax = repmat([0 -1 ; 1 0 ] , [1 1 nCars nSims ]);
+        omega_scalar = reshape(EKF_x(6,:,:,t-1), [1 1 nCars nSims]);
+        omegax = omega_scalar .* omegax;
+        kf_vel = sqrt( EKF_x(4,:,:,t-1).^2 + EKF_x(5,:,:,t-1).^2 );
+        padvy = zeros(size(EKF_x(6,:,:,t-1)));
+        coriolis  = squeeze(pagemtimes(omegax,reshape([kf_vel; padvy], [2 1 nCars nSims])));   %first add extra dim to use elementwise product, then use pagemtimes to do matrix vector, then remove the extra batch dimension
+
+        other = pagemtimes( omegax , reshape([ EKF_x(1,:,:,t-1), EKF_x(2,:,:,t-1) ], [2 1 nCars nSims]) ) ;
+        other = pagemtimes(omegax,other);
+        other = squeeze(other);
+        %accel_r = accel + coriolis + other;
+
+        theta = EKF_x(3,:,:,t-1); 
+        % this was the error. In hartzer's original code, he takes the t value of the array, but it's just zero since it hasnt been loaded yet
+        % It doesnt end up mattering since he doesnt have the vehicle do
+        % any turns........
+            accel_r = [...
+            cos(theta) .* accel(1,:,:) - sin(theta).*accel(2,:,:) ;...
+            sin(theta) .* accel(1,:,:) + cos(theta).*accel(2,:,:) ];
+
         
         gyro = x_truth(4,:,t) .* tan(del(t,:)) / wb ...
-            + normrnd(0, imu_gyr_err, [1, nCars, nSims]); % v*tan*(delta)/wb is the vehicle angular rate in the bycicle mode, which is what is being measured by the gyro
+            + normrnd(0, imu_gyr_err, [1, nCars, nSims]); 
         
         mag = x_truth(3,:,t) ...  
             + normrnd(0, imu_mag_err, [1, nCars, nSims]);
         
-        theta = EKF_x(3,:,:,t);
 
-        accel_r = [...
-            -sin(theta) .* accel(1,:,:) - cos(theta).*accel(2,:,:) ;...
-             cos(theta) .* accel(1,:,:) - sin(theta).*accel(2,:,:) ];
+
 
         EKF_x(:,:,:,t) = [...
             EKF_x(1,:,:,t-1) + EKF_x(4,:,:,t-1) * dt + accel_r(1,:,:) / 2 * dt^2; ...
@@ -49,7 +68,7 @@ else
            (EKF_x(3,:,:,t-1) + gyro * dt) * 0.98 + 0.02 * mag;...
             EKF_x(4,:,:,t-1) + accel_r(1,:,:) * dt;...
             EKF_x(5,:,:,t-1) + accel_r(2,:,:) * dt;...
-            gyro
+            gyro; ...
             EKF_x(7,:,:,t-1)];
 
         
@@ -95,30 +114,21 @@ else
         z_del = del(t,:) + normrnd(0, sa_err, [1, nCars, nSims]);
         
         z = [   z_vel;...
-                z_vel.*tan(z_del) / wb];
+                z_del];
 
         kf_vel = sqrt( EKF_x(4,:,:,t).^2 + EKF_x(5,:,:,t).^2 );
         H = zeros(2,7,nCars,nSims);
         H(1,4,:,:) = EKF_x(4,:,:,t) ./ kf_vel;
         H(1,5,:,:) = EKF_x(5,:,:,t) ./ kf_vel;
-        H(2,4,:,:) = tan(EKF_x(7,:,:,t))/wb;
-        dtan = ( sec(EKF_x(7,:,:,t)) ).^2;
-        H(2,7,:,:) = EKF_x(4,:,:,t).*(dtan);
-        
-        h = [kf_vel; EKF_x(6,:,:,t)];
+        H(2,7,:,:) = 1;
+        h = [kf_vel; EKF_x(7,:,:,t)];
 
         R = zeros(2,2,nCars,nSims);
         R(1,1,:,:) = enc_err*enc_err;
-        R(2,2,:,:) = imu_mag_err*imu_mag_err;
+        R(2,2,:,:) = sa_err*sa_err;
 
-        M = zeros(2,2,nCars,nSims);
-        M(1,1,:,:) = 1;
-        M(2,2,:,:) = EKF_x(4,:,:,t) .* dtan;
-
-        
-        
         K = pageDiv( pagemtimes(EKF_P,'none',H,'transpose'), (pagemtimes( pagemtimes(H,EKF_P), 'none', H, 'transpose') + ...
-            pagemtimes(M ,pagemtimes(R,'none',M,'transpose')) ));
+            R ));
 
         EKF_x(:,:,:,t) = EKF_x(:,:,:,t) + reshape( pagemtimes( K, reshape((z-h), [2, 1, nCars, nSims])), [7, nCars, nSims]);
         EKF_P = pagemtimes( (repmat(eye(7), [1,1,nCars,nSims]) - pagemtimes(K,H)), EKF_P);
@@ -132,7 +142,7 @@ else
                 end
              end
    %%%%%%%%%%%%%%%%%%%%%%%%% 
-        clear z_vel z_del z kf_vel H h R K M
+        clear z_vel z_del z kf_vel H h R K
     end
 
     % GPS step at 10 Hz

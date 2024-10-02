@@ -7,10 +7,14 @@ DCL_diff = DCL_x(1:3,:,:,:) - repmat(reshape(x_truth(1:3,:,:), [3, nCars, 1, nTi
 DCL_err  = [sqrt(DCL_diff(1,:,:,:).^2 + DCL_diff(2,:,:,:).^2); DCL_diff(3,:,:,:,:)];
 DCL_rmse = reshape(RMSE(DCL_err), [2, nSims]); 
 
+GSF_MAP_diff = GSF_MAP_x(1:3,:,:,:) - repmat(reshape(x_truth(1:3,:,:), [3, nCars, 1, nTicks]), [1, 1, nSims, 1]);
+GSF_MAP_err  = [sqrt(GSF_MAP_diff(1,:,:,:).^2 + GSF_MAP_diff(2,:,:,:).^2); GSF_MAP_diff(3,:,:,:,:)];
+GSF_MAP_rmse = reshape(RMSE(GSF_MAP_err), [2, nSims]); 
+
 
 clear EKF_diff EKF_err;
 clear DCL_diff DCL_err;
-
+clear GSF_MAP_diff GSF_MAP_err;
 
 function err = RMSE(x)
     m = size(x,1);

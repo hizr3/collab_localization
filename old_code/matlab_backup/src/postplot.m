@@ -6,19 +6,17 @@ nBins = 40;
 ea = 0.3;
 fa = 0.8;
 
-p_max = max([GSF_MAP_rmse(1,:),EKF_rmse(1,:), CKF_rmse(1,:), DCL_rmse(1,:)]);
-p_min = min([GSF_MAP_rmse(1,:),EKF_rmse(1,:), CKF_rmse(1,:), DCL_rmse(1,:)]);
+p_max = max([GSF_MAP_rmse(1,:),EKF_rmse(1,:) DCL_rmse(1,:)]);
+p_min = min([GSF_MAP_rmse(1,:),EKF_rmse(1,:) DCL_rmse(1,:)]);
 p_step = min([  range(GSF_MAP_rmse(1,:)), ...
-                range(CKF_rmse(1,:)), ...
                 range(DCL_rmse(1,:)), ...
                 range(EKF_rmse(1,:))] / nBins);
 p_edges = p_min:p_step:p_max;
       
-t_max = max([GSF_MAP_rmse(2,:) , EKF_rmse(2,:), CKF_rmse(2,:), DCL_rmse(2,:)]);
-t_min = min([GSF_MAP_rmse(2,:) , EKF_rmse(2,:), CKF_rmse(2,:), DCL_rmse(2,:)]);
+t_max = max([GSF_MAP_rmse(2,:) , EKF_rmse(2,:), DCL_rmse(2,:)]);
+t_min = min([GSF_MAP_rmse(2,:) , EKF_rmse(2,:), DCL_rmse(2,:)]);
 t_step = min([  range(GSF_MAP_rmse(2,:)),...
                 range(EKF_rmse(2,:)), ...
-                range(CKF_rmse(2,:)), ...
                 range(DCL_rmse(2,:))] / nBins);
 t_edges = t_min:t_step:t_max;
 
