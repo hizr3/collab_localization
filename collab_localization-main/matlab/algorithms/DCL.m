@@ -2,17 +2,32 @@ if t == 1
     
     DCL_x = zeros(6, nCars, nSims, nTicks);
     DCL_x(1:3,:,:,t) = repmat(x_truth(1:3,:,t), [1,1,nSims]);
-    DCL_x(4,:,:,t)   = repmat(-sin(x_truth(3,:,t)) .* x_truth(4,:,t), [1,1,nSims]);
-    DCL_x(5,:,:,t)   = repmat( cos(x_truth(3,:,t)) .* x_truth(4,:,t), [1,1,nSims]);
+    DCL_x(4,:,:,t)   = repmat(cos(x_truth(3,:,t)) .* x_truth(4,:,t), [1,1,nSims]);
+    DCL_x(5,:,:,t)   = repmat(sin(x_truth(3,:,t)) .* x_truth(4,:,t), [1,1,nSims]);
                    
-    DCL_s = repmat(... 
-            diag([  imu_acc_err / 2 / rate_imu^2    ;...
-                    imu_acc_err / 2 / rate_imu^2    ;...
-                    imu_gyr_err / rate_imu          ;...
-                    imu_acc_err / rate_imu          ;...
-                    imu_acc_err / rate_imu          ;...
-                    imu_gyr_err]), [1,1,nCars,nCars,nSims]);
-                
+  DCL_s = repmat(... 
+            diag([  imu_acc_err*imu_acc_err / 2 / rate_imu^2    ;...
+                    imu_acc_err*imu_acc_err/ 2 / rate_imu^2    ;...
+                    imu_gyr_err*imu_gyr_err/ rate_imu          ;...
+                    imu_acc_err*imu_acc_err / rate_imu          ;...
+                    imu_acc_err*imu_acc_err / rate_imu          ;...
+                    imu_gyr_err*imu_gyr_err]), [1,1,nCars,nCars,nSims]);
+
+
+   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%       
+            for j3 = 1 : nCars
+             for j2 = 1 : nSims
+                for j1 = 1 : nCars
+                    %Resymmetrize
+                    temp0 = DCL_s(:,:,j3,j1,j2);
+                    temp0 = 0.5*(temp0 + temp0');
+                    DCL_s(:,:,j3,j1,j2) = temp0;           
+                end
+             end
+            end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
 else
 
     % Predict Step at 400 Hz
@@ -27,11 +42,11 @@ else
         mag = x_truth(3,:,t) ...
             + normrnd(0, imu_mag_err, [1, nCars, nSims]);
         
-        theta = DCL_x(3,:,:,t);
+        theta = DCL_x(3,:,:,t-1);
 
         accel_r = [...
-            -sin(theta) .* accel(1,:,:) - cos(theta).*accel(2,:,:) ;...
-             cos(theta) .* accel(1,:,:) - sin(theta).*accel(2,:,:) ];
+            cos(theta) .* accel(1,:,:) - sin(theta).*accel(2,:,:) ;...
+             sin(theta) .* accel(1,:,:) + cos(theta).*accel(2,:,:) ];
 
         DCL_x(:,:,:,t) = [...
             DCL_x(1,:,:,t-1) + DCL_x(4,:,:,t-1) * dt + accel_r(1,:,:) / 2 * dt^2; ...
@@ -42,12 +57,12 @@ else
             gyro];
 
         
-        Q = diag([  imu_acc_err / 2 / rate_imu^2    ;...
-                    imu_acc_err / 2 / rate_imu^2    ;...
-                    imu_gyr_err / rate_imu          ;...
-                    imu_acc_err / rate_imu          ;...
-                    imu_acc_err / rate_imu          ;...
-                    imu_gyr_err]);
+        Q = diag([  imu_acc_err*imu_acc_err / 2 / rate_imu^2    ;...
+                    imu_acc_err*imu_acc_err/ 2 / rate_imu^2    ;...
+                    imu_gyr_err*imu_gyr_err/ rate_imu          ;...
+                    imu_acc_err*imu_acc_err / rate_imu          ;...
+                    imu_acc_err*imu_acc_err / rate_imu          ;...
+                    imu_gyr_err*imu_gyr_err]);
 
 
         F = [   1,  0,  0, dt,  0,  0  ;...
@@ -61,6 +76,18 @@ else
             DCL_s(:,:,i,i,:) = pagemtimes( pagemtimes( F, DCL_s(:,:,i,i,:)),'none', F, 'transpose') + Q;
             DCL_s(:,:,i,setdiff(1:nCars,i),:) = pagemtimes( F, DCL_s(:,:,i,setdiff(1:nCars,i),:));
         end
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%       
+            for j3 = 1 : nCars
+             for j2 = 1 : nSims
+                for j1 = 1 : nCars
+                    %Resymmetrize
+                    temp0 = DCL_s(:,:,j3,j1,j2);
+                    temp0 = 0.5*(temp0 + temp0');
+                    DCL_s(:,:,j3,j1,j2) = temp0;           
+                end
+             end
+            end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
         clear accel accel_r gyro mag theta Q F
     end
@@ -86,7 +113,7 @@ else
         R = zeros(2,2,nCars,nSims);
         R(1,1,:,:) = enc_err;
         R(2,2,:,:) = str_err * z_vel / wb;
-        
+
         for i = 1:nCars
             sigma = reshape(DCL_s(:,:,i,i,:), [6,6,nSims]);
             Hr = reshape(H(:,:,i,:), [2,6,nSims]);
@@ -125,10 +152,10 @@ else
                 kf_vel];
             
         R = repmat(diag([  ...
-            gps_per;...
-            gps_per;...
-            gps_her;...
-            gps_ver]), [1, 1, nCars, nSims]);
+            gps_per*gps_per;...
+            gps_per*gps_per;...
+            gps_her*gps_her;...
+            gps_ver*gps_ver]), [1, 1, nCars, nSims]);
 
         for i = 1:nCars
             sigma = reshape(DCL_s(:,:,i,i,:), [6,6,nSims]);
@@ -140,6 +167,19 @@ else
             DCL_x(:,i,:,t) = DCL_x(:,i,:,t) + pagemtimes( K, (z(:,i,:)-h(:,i,:)));
             DCL_s(:,:,i,:,:) = pagemtimes( reshape(repmat(eye(6), [1,1,nSims]) - pagemtimes(K, Hr), [6,6,1,1,nSims]), DCL_s(:,:,i,:,:));
         end
+
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%       
+            for j3 = 1 : nCars
+             for j2 = 1 : nSims
+                for j1 = 1 : nCars
+                    %Resymmetrize
+                    temp0 = DCL_s(:,:,j3,j1,j2);
+                    temp0 = 0.5*(temp0 + temp0');
+                    DCL_s(:,:,j3,j1,j2) = temp0;           
+                end
+             end
+            end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 
         clear z_x z_y z_t z_v z kf_vel H h R K sigma Hr Rr i 
     end

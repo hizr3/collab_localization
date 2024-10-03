@@ -33,7 +33,7 @@ clear t_min t_max;
 clear p_edges t_edges;
 
 % Choose any MC run. I chose 42 
-trstar = 42;
+trstar = 1;
 
 % Vehicle 1 trajectory
 figure(2)

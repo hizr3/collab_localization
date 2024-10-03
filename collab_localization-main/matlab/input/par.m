@@ -1,5 +1,5 @@
-nSims = 1000;
-runtime =10;
+nSims = 10^1;
+runtime =20;
 SF = -0;
 sve = false;
 
