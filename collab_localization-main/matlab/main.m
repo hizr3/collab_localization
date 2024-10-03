@@ -14,7 +14,7 @@ par;
 %%
 tic
 for t=1:length(ticks)
-    t;
+    t
     Truth;
     EKF;
     DCL;

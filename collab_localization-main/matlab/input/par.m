@@ -1,5 +1,5 @@
-nSims = 10^1;
-runtime =20;
+nSims = 10^3;
+runtime =3;
 SF = -0;
 sve = false;
 
@@ -49,7 +49,7 @@ tw = 2;
 % imu_mag_err = 0   * 10^SF;
 % sa_err = 0  * 10^SF;
 
-gps_per = 1       * 10^SF;
+gps_per = 1.2      * 10^SF;
 gps_her = 0.035     * 10^SF;
 gps_ver = 0.05      * 10^SF;
 enc_err = 0.05      * 10^SF;
@@ -87,7 +87,7 @@ nTicks = length(ticks)
      del_err_int = 0;
      for i = 2 : nTicks
       % Compute reference input
-       del_ref(i,:) = sat( cos(i*dt*2*pi*3), 0.7) ; % 0.5 rad is approx 28 deg
+       del_ref(i,:) = sat( cos(i*dt*2*pi*3), 0.5) ; % 0.5 rad is approx 28 deg
       % Compute driving input for vehicle 1
        del_err_old = del_err;
        del_err = del_ref(i,1) - del(i,1);

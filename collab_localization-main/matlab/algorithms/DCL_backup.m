@@ -52,7 +52,7 @@ else
             DCL_x(4,:,:,t-1) + accel_r(1,:,:) * dt;...
             DCL_x(5,:,:,t-1) + accel_r(2,:,:) * dt;...
             gyro;...
-            DCL_x(7,:,:,t)];
+            DCL_x(7,:,:,t-1)];
 
         
         Q = diag([  imu_acc_err*imu_acc_err / 2 / rate_imu^2    ;...
@@ -110,7 +110,7 @@ else
         h = [kf_vel; EKF_x(7,:,:,t)];
         R = zeros(2,2,nCars,nSims);
         R(1,1,:,:) = enc_err*enc_err;
-        R(2,2,:,:) = imu_mag_err*imu_mag_err;
+        R(2,2,:,:) = sa_err*sa_err;
 
 
         for i = 1:nCars
