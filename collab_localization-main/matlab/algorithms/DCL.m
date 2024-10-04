@@ -1,5 +1,7 @@
 if t == 1
-    
+    cck998 = true;
+    cck999 = true;
+    cck1000 = true;
     DCL_x = zeros(7, nCars, nSims, nTicks);
     nx = size(DCL_x, 1);
     DCL_x(1:3,:,:,t) = repmat(x_truth(1:3,:,t), [1,1,nSims]);
@@ -188,11 +190,12 @@ else
         clear z_x z_y z_t z_v z kf_vel H h R K sigma Hr Rr i 
     end
     
-reduced_idx = [1:6];
 
     % UWB Update Step
     if mod(t, rate/rate_uwb) == 0 && nCars > 1 && sensors(3)
         B = nchoosek(1:nCars,2);
+        B_h = [B(:,2) , B(:,1) ];
+        B = [ B ; B_h ];
         
         for i = 1:size(B,1)
             z_x = x_truth(1,B(i,1),t) - x_truth(1,B(i,2),t);
@@ -203,35 +206,63 @@ reduced_idx = [1:6];
             h_y = DCL_x(2, B(i,1), :, t) - DCL_x(2, B(i,2), :, t);
             h = sqrt(h_x.^2 + h_y.^2);
             
-            Sigma_ii = DCL_s(reduced_idx, reduced_idx, B(i,1), B(i,1), :);
-            Sigma_jj = DCL_s(reduced_idx, reduced_idx, B(i,2), B(i,2), :);
-            Sigma_ij = pagemtimes(DCL_s(reduced_idx,reduced_idx,B(i,1),B(i,2),:), 'none', DCL_s(reduced_idx,reduced_idx,B(i,2),B(i,1),:), 'transpose');
-            Sigma_aa = reshape([Sigma_ii, Sigma_ij; pagetranspose(Sigma_ij), Sigma_jj], [12,12,nSims]);
-            
-            H = zeros(1,12, nSims);
+            Sigma_ii = DCL_s(:, :, B(i,1), B(i,1), :);
+            Sigma_jj = DCL_s(:, :, B(i,2), B(i,2), :);
+            Sigma_ij = pagemtimes(DCL_s(:,:,B(i,1),B(i,2),:), 'none', DCL_s(:,:,B(i,2),B(i,1),:), 'transpose');
+            Sigma_aa = reshape([Sigma_ii, Sigma_ij; pagetranspose(Sigma_ij), Sigma_jj], [14,14,nSims]);
+
+            H = zeros(1,14, nSims);
             H(1,1,:) =   h_x ./ (h);
-            H(1,7,:) = - h_x ./ (h);
+            H(1,8,:) = - h_x ./ (h);
             H(1,2,:) =   h_y ./ (h);
-            H(1,8,:) = - h_y ./ (h);
-            
-            R = uwb_err;
-            
+            H(1,9,:) = - h_y ./ (h);
+            R(1,1,nSims) = uwb_err*uwb_err; 
             Ka = pageDiv( pagemtimes(Sigma_aa, 'none', H, 'transpose'), pagemtimes( pagemtimes(H,Sigma_aa), 'none', H, 'transpose') + R );
-
             update = pagemtimes(Ka, z - h);
-            DCL_x(reduced_idx, B(i,1), :, t) = DCL_x(reduced_idx, B(i,1), :, t) + update(1:6, 1,:);
-            DCL_x(reduced_idx, B(i,2), :, t) = DCL_x(reduced_idx, B(i,2), :, t) + update(7:12,1,:);
+            DCL_x(:, B(i,1), :, t) = DCL_x(:, B(i,1), :, t) + update(1:7, 1,:);
+            DCL_x(:, B(i,2), :, t) = DCL_x(:, B(i,2), :, t) + update(8:14,1,:);
             
-            Sigma_t = pagemtimes(repmat(eye(12),      [1,1,nSims]) - pagemtimes(Ka, H), Sigma_aa);
+            Sigma_t = pagemtimes(repmat(eye(14),      [1,1,nSims]) - pagemtimes(Ka, H), Sigma_aa);
             
-            DCL_s(reduced_idx,reduced_idx,B(i,1),setdiff(1:nCars, B(i,:)), :) = pagemtimes(pageDiv(Sigma_t(1:6,  1:6,  :), Sigma_ii), DCL_s(reduced_idx,reduced_idx,B(i,1),setdiff(1:nCars, B(i,:)), :));
-            DCL_s(reduced_idx,reduced_idx,B(i,2),setdiff(1:nCars, B(i,:)), :) = pagemtimes(pageDiv(Sigma_t(7:12, 7:12, :), Sigma_jj), DCL_s(reduced_idx,reduced_idx,B(i,2),setdiff(1:nCars, B(i,:)), :));
+            DCL_s(:,:,B(i,1),setdiff(1:nCars, B(i,:)), :) = pagemtimes(pageDiv(Sigma_t(1:7,  1:7,  :), Sigma_ii), DCL_s(:,:,B(i,1),setdiff(1:nCars, B(i,:)), :));
+            DCL_s(:,:,B(i,2),setdiff(1:nCars, B(i,:)), :) = pagemtimes(pageDiv(Sigma_t(8:14, 8:14, :), Sigma_jj), DCL_s(:,:,B(i,2),setdiff(1:nCars, B(i,:)), :));
 
-            DCL_s(reduced_idx,reduced_idx,B(i,1),B(i,1),:) = Sigma_t(1:6,  1:6,  :);
-            DCL_s(reduced_idx,reduced_idx,B(i,2),B(i,2),:) = Sigma_t(7:12, 7:12, :);
-            DCL_s(reduced_idx,reduced_idx,B(i,1),B(i,2),:) = Sigma_t(1:6,  7:12, :);
-            DCL_s(reduced_idx,reduced_idx,B(i,2),B(i,1),:) = repmat(eye(6), [1,1,nSims]); % set the sqrt of sigma to identity
-        
+            DCL_s(:,:,B(i,1),B(i,1),:) = Sigma_t(1:7,  1:7,  :);
+            DCL_s(:,:,B(i,2),B(i,2),:) = Sigma_t(8:14, 8:14, :);
+            DCL_s(:,:,B(i,1),B(i,2),:) = Sigma_t(1:7,  8:14, :);
+            DCL_s(:,:,B(i,2),B(i,1),:) = repmat(eye(7), [1,1,nSims]); % set the sqrt of sigma to identity
+
+            if t == 998 && cck998 == true
+               t
+               cck998 = false;
+               Sigma_aa(:,:,1)
+               eigSigma = eig(Sigma_aa(:,:,i))
+               H(:,:,1)
+               R(:,:,1)
+               Ka(:,:,1)
+               Sigma_t(:,:,1)
+            end
+            if t == 999 && cck999 == true
+                t
+               cck999 = false;
+               Sigma_aa(:,:,1)
+               eigSigma = eig(Sigma_aa(:,:,i))
+               H(:,:,1)
+               R(:,:,1)
+               Ka(:,:,1)
+               Sigma_t(:,:,1)
+            end
+            if t == 1000 && cck1000 == true
+                t
+               cck1000 = false;
+               Sigma_aa(:,:,1)
+               eigSigma = eig(Sigma_aa(:,:,i))
+               H(:,:,1)
+               R(:,:,1)
+               Ka(:,:,1)
+               Sigma_t(:,:,1)
+            end
+
         end
         clear z_x z_y z H h R K i B h_x h_y
 
@@ -250,4 +281,12 @@ reduced_idx = [1:6];
 
 
     end
+
+
+DEBUG_DCL_P(:,:,t) = DCL_s(:,:,1,1,1);
+
+
+
+
+
 end

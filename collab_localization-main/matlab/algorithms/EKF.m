@@ -94,16 +94,16 @@ else
                         F, ...
                         EKF_P),'none',...
                     F, 'transpose') + Q;
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-             for j2 = 1 : nSims
-                for j1 = 1 : nCars
-                    %Resymmetrize
-                    temp0 = EKF_P(:,:,j1,j2);
-                    temp0 = 0.5*(temp0 + temp0');
-                    EKF_P(:,:,j1,j2) = temp0;           
-                end
-             end
-   %%%%%%%%%%%%%%%%%%%%%%%%%         
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%              for j2 = 1 : nSims
+%                 for j1 = 1 : nCars
+%                     %Resymmetrize
+%                     temp0 = EKF_P(:,:,j1,j2);
+%                     temp0 = 0.5*(temp0 + temp0');
+%                     EKF_P(:,:,j1,j2) = temp0;           
+%                 end
+%              end
+%    %%%%%%%%%%%%%%%%%%%%%%%%%         
         clear accel accel_r gyro mag theta Q F
     end
 
@@ -132,16 +132,16 @@ else
 
         EKF_x(:,:,:,t) = EKF_x(:,:,:,t) + reshape( pagemtimes( K, reshape((z-h), [2, 1, nCars, nSims])), [7, nCars, nSims]);
         EKF_P = pagemtimes( (repmat(eye(7), [1,1,nCars,nSims]) - pagemtimes(K,H)), EKF_P);
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-             for j2 = 1 : nSims
-                for j1 = 1 : nCars
-                    %Resymmetrize
-                    temp0 = EKF_P(:,:,j1,j2);
-                    temp0 = 0.5*(temp0 + temp0');
-                    EKF_P(:,:,j1,j2) = temp0;           
-                end
-             end
-   %%%%%%%%%%%%%%%%%%%%%%%%% 
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%              for j2 = 1 : nSims
+%                 for j1 = 1 : nCars
+%                     %Resymmetrize
+%                     temp0 = EKF_P(:,:,j1,j2);
+%                     temp0 = 0.5*(temp0 + temp0');
+%                     EKF_P(:,:,j1,j2) = temp0;           
+%                 end
+%              end
+%    %%%%%%%%%%%%%%%%%%%%%%%%% 
         clear z_vel z_del z kf_vel H h R K
     end
 
@@ -178,16 +178,16 @@ else
 
         EKF_x(:,:,:,t) = EKF_x(:,:,:,t) + reshape( pagemtimes( K, reshape(z - h, [4, 1, nCars, nSims])), [7, nCars, nSims] );
         EKF_P = pagemtimes( ( repmat( eye(7), [1,1,nCars,nSims] ) - pagemtimes(K,H) ), EKF_P );
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-             for j2 = 1 : nSims
-                for j1 = 1 : nCars
-                    %Resymmetrize
-                    temp0 = EKF_P(:,:,j1,j2);
-                    temp0 = 0.5*(temp0 + temp0');
-                    EKF_P(:,:,j1,j2) = temp0;           
-                end
-             end
-   %%%%%%%%%%%%%%%%%%%%%%%%% 
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%              for j2 = 1 : nSims
+%                 for j1 = 1 : nCars
+%                     %Resymmetrize
+%                     temp0 = EKF_P(:,:,j1,j2);
+%                     temp0 = 0.5*(temp0 + temp0');
+%                     EKF_P(:,:,j1,j2) = temp0;           
+%                 end
+%              end
+%    %%%%%%%%%%%%%%%%%%%%%%%%% 
         clear z_x z_y z_t z_v z kf_vel H h R K
     end
 end

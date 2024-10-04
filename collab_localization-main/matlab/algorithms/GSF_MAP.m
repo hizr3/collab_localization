@@ -510,19 +510,19 @@ end
 
 
 
-% %%% Prune all other hypos %%%%%
-%     for j2 = 1 : nSims
-%         for j1 = 1 : nCars
-%         x_mean = GSF_MAP_x(:,j1,j2,t);
-%         GSF_MAP_struct.CA_x(:,j1,j2,t) = x_mean ;
-%         GSF_MAP_struct.CT_x(:,j1,j2,t) = x_mean ;
-%         GSF_MAP_struct.CV_x(:,j1,j2,t) = x_mean  ;
-% 
-%        GSF_MAP_struct.CA_P(:,:,j1,j2) = GSF_MAP_P(:,:,j1,j2) ;
-%        GSF_MAP_struct.CT_P(:,:,j1,j2) = GSF_MAP_P(:,:,j1,j2);
-%        GSF_MAP_struct.CV_P(:,:,j1,j2) = GSF_MAP_P(:,:,j1,j2);
-%         end
-%     end
+%%% Prune all other hypos %%%%%
+    for j2 = 1 : nSims
+        for j1 = 1 : nCars
+        x_mean = GSF_MAP_x(:,j1,j2,t);
+        GSF_MAP_struct.CA_x(:,j1,j2,t) = x_mean ;
+        GSF_MAP_struct.CT_x(:,j1,j2,t) = x_mean ;
+        GSF_MAP_struct.CV_x(:,j1,j2,t) = x_mean  ;
+
+       GSF_MAP_struct.CA_P(:,:,j1,j2) = GSF_MAP_P(:,:,j1,j2) ;
+       GSF_MAP_struct.CT_P(:,:,j1,j2) = GSF_MAP_P(:,:,j1,j2);
+       GSF_MAP_struct.CV_P(:,:,j1,j2) = GSF_MAP_P(:,:,j1,j2);
+        end
+    end
 
 
 GSF_MAP_struct.w = log( GSF_MAP_struct.w);

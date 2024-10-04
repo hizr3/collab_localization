@@ -1,5 +1,5 @@
 nSims = 10^3;
-runtime =3;
+runtime =30 ;
 SF = -0;
 sve = false;
 
@@ -10,12 +10,12 @@ sensors = [true, true, true];
 
 
 
-nCars = 6;
+nCars = 2;
 in_name = 'par';
 
-    x0 = randn(2,nCars) ; % random xy position
-    x0 = [x0 ; 2*rand( 1,nCars) - 1] ; % orientation
-    x0 = [x0 ; randi(10, 1,nCars)]; % random velocity
+x0 = randn(2,nCars) ; % random xy position
+x0 = [x0 ; 2*rand( 1,nCars) - 1] ; % orientation
+x0 = [x0 ; randi(10, 1,nCars)]; % random velocity
 
 
 
@@ -54,7 +54,7 @@ gps_her = 0.035     * 10^SF;
 gps_ver = 0.05      * 10^SF;
 enc_err = 0.05      * 10^SF;
 str_err = 0.05      * 10^SF;
-uwb_err = 0.30      * 10^SF;
+uwb_err = 0.9      * 10^SF;
 imu_acc_err = 0.1   * 10^SF;
 imu_gyr_err = 0.1   * 10^SF;
 imu_mag_err = 0.1   * 10^SF;
@@ -77,7 +77,7 @@ nTicks = length(ticks)
   
     % Very hard trajectory
     % Acc input
-     acc = randi([0 , 1] ,nTicks,nCars) + 0.000001*rand(nTicks , nCars) ;
+     acc = 0.0000001*rand(nTicks , nCars) ;
 
     phi_dot = @(y,u) (-tan(y)*tan(y)*u)/(4+4*tan(y)*tan(y)) ;
     % Steering angle reference
