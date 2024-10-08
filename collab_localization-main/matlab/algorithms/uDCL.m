@@ -217,9 +217,16 @@ else
             % Extended state covariance matrix
             Sigma_aa = [Sigma_ii, Sigma_ij; Sigma_ij', Sigma_jj];
             Sigma_aa = 0.5*(Sigma_aa + Sigma_aa');
-            Sigma_aa = Sigma_aa + 0.005*eye(2*nx);
+
+            %%%%%%% Covariance Intersection Avoidance algorithm
+            
+            %    SIGMA_star_a = ?? 
+             %   SIGMA_star_b = ?
+                Sigma_aa = [SIGMA_star_a , zeros(nx,nx) ; zeros(nx,nx) , SIGMA_star_b ];
+            %%%%%%%
+
             uDCL_x_aa = [  uDCL_x(:, B(i,1), k, t) ; ...
-                          uDCL_x(:, B(i,2), k, t) ] ;
+                           uDCL_x(:, B(i,2), k, t) ] ;
             
             % UKF update step
             [x_sp, w_sp] = ut(uDCL_x_aa,Sigma_aa,kappa);
@@ -231,6 +238,7 @@ else
             K_uwb = myxcov(w_sp,x_sp, uDCL_x_aa , h_sp,h_hat)/S_uwb;
             uDCL_x_aa = uDCL_x_aa + K_uwb*z_res;
             Sigma_aa = Sigma_aa - K_uwb*Py*(K_uwb');
+            Sigma_aa = 0.5*(Sigma_aa + Sigma_aa');
 
              % Last step of uDCL Update. i and j share info with the platoon
               upd_idx = setdiff(1:nCars, B(i,:));
@@ -249,6 +257,7 @@ else
             % if nCars = 3, for example, the above for becomes just 2
             % assignments
 
+            % update cov ingfo
             uDCL_s(:,:,B(i,1),B(i,1),k) = Sigma_aa(idx1,idx1);
             uDCL_s(:,:,B(i,2),B(i,2),k) = Sigma_aa(idx2,idx2);
             uDCL_s(:,:,B(i,1),B(i,2),k) = Sigma_aa(idx1,idx2);
@@ -273,7 +282,7 @@ else
     end
 
 
-
+DEBUG_DCL_P(:,:,1,t) = uDCL_s(:,:,1,1,t) ;
 
 end
 
@@ -287,7 +296,7 @@ nx = size(x,1);
 [U, S, V]  =  svd((kappa + nx)*0.5*(P + P'));
 S = 0.5*(S + S');
 sqrtScaledCov = U* sqrt(S) * V';
-sigma_points = zeros(nx,2*nx); % Allocate space
+sigma_points = zeros(nx,2*nx); 
 weights = zeros(1,2*nx);
     for i = 1 : nx
         delta_x = sqrtScaledCov(:,i);
@@ -335,9 +344,37 @@ end
 
 function [value_mean] = circularMean(w,values)
 
-Y = sum(w.*sin(values), 2)
-X = sum(w.*cos(values), 2)
+Y = sum(w.*sin(values), 2);
+X = sum(w.*cos(values), 2);
 value_mean = atan2(Y_sum,X_sum);
 
+
+end
+
+
+function [c,C,omega]=CI(a,A,b,B,H)
+%
+% function [c,C,omega]=CI(a,A,b,B,H)
+%
+% This function implements the CI algorithm and fuses two estimates
+% (a,A) and (b,B) together to give a new estimate (c,C) and the value
+% of omega which minimizes the determinant of C. The observation
+% matrix is H.
+Ai=inv(A);
+Bi=inv(B);
+% Work out omega using the matlab constrained minimiser function
+% fminbnd().
+f=inline('1/det(Ai*omega+H''*Bi*H*(1-omega))', ...
+'omega', 'Ai', 'Bi', 'H');
+omega=fminbnd(f,0,1,optimset('Display','off'),Ai,Bi,H);
+% The unconstrained version of this optimisation is:
+% omega = fminsearch(f,0.5,optimset('Display','off'),Ai,Bi,H);
+% omega = min(max(omega,0),1);
+% New covariance
+C=inv(Ai*omega+H'*Bi*H*(1-omega));
+% New mean
+nu=b-H*a;
+W=(1-omega)*C*H'*Bi;
+c=a+W*nu;
 
 end

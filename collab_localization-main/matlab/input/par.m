@@ -10,7 +10,7 @@ sensors = [true, true, true];
 
 
 
-nCars = 2;
+nCars = 6;
 in_name = 'par';
 
 x0 = randn(2,nCars) ; % random xy position

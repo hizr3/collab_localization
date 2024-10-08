@@ -1,7 +1,7 @@
 if t == 1
-    cck998 = true;
-    cck999 = true;
-    cck1000 = true;
+    cck998 = false;
+    cck999 = false;
+    cck1000 = false;
     DCL_x = zeros(7, nCars, nSims, nTicks);
     nx = size(DCL_x, 1);
     DCL_x(1:3,:,:,t) = repmat(x_truth(1:3,:,t), [1,1,nSims]);

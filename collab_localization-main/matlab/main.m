@@ -11,22 +11,21 @@ addpath('src');
 %%
 
 par;   
+%%% Elapsed time is 1429.983475 seconds. ca 23 minuti
 
 DEBUG_DCL_P = zeros(7,7,nTicks);
 %%
 tic
 for t=1:length(ticks)
-    t;
+    t
     Truth;
     EKF;
-    DCL;
-    %uDCL;
+    uDCL;
     GSF_MAP;
 end
 toc
 %%
 close all
-postprocessor;
 postplot;
 
 
