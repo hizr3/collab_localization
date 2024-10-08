@@ -193,13 +193,8 @@ else
     if mod(t, rate/rate_uwb) == 0 && nCars > 1 && sensors(3)
 
         B = nchoosek(1:nCars,2);
-        B_h = [B(:,2) , B(:,1) ];
-        B = [ B ; B_h ];
-
-
-
       R_uwb = uwb_err*uwb_err;
-      kappa = 1;
+      kappa = 0.5;
       idx1 = [1:nx];
       idx2 = idx1 + nx;
 
@@ -213,29 +208,23 @@ else
             % Process 
             Sigma_ii = uDCL_s(:, :, B(i,1), B(i,1), k); 
             Sigma_jj = uDCL_s(:, :, B(i,2), B(i,2), k);
-            Sigma_ij = uDCL_s(:,:,B(i,1),B(i,2),k)*uDCL_s(:,:,B(i,2),B(i,1),k);
+            Sigma_ij = uDCL_s(:,:,B(i,1),B(i,2),k)*uDCL_s(:,:,B(i,2),B(i,1),k)';
+
             % Extended state covariance matrix
             Sigma_aa = [Sigma_ii, Sigma_ij; Sigma_ij', Sigma_jj];
             Sigma_aa = 0.5*(Sigma_aa + Sigma_aa');
-
-            %%%%%%% Covariance Intersection Avoidance algorithm
-            
-            %    SIGMA_star_a = ?? 
-             %   SIGMA_star_b = ?
-                Sigma_aa = [SIGMA_star_a , zeros(nx,nx) ; zeros(nx,nx) , SIGMA_star_b ];
-            %%%%%%%
-
+            Sigma_aa = [2*Sigma_ii , zeros(nx,nx) ; zeros(nx , nx) , 2*Sigma_jj ];
             uDCL_x_aa = [  uDCL_x(:, B(i,1), k, t) ; ...
                            uDCL_x(:, B(i,2), k, t) ] ;
-            
+
             % UKF update step
             [x_sp, w_sp] = ut(uDCL_x_aa,Sigma_aa,kappa);
-            h_sp = splitapply(@measfunc,x_sp, [1:length(w_sp)]);
-            h_hat = sum(w_sp.*h_sp , 2);
-            z_res = z - h_hat;
-            Py = mycov(w_sp,h_sp,h_hat);
+            z_sp = splitapply(@measfunc,x_sp, [1:length(w_sp)]);
+            z_hat = sum(w_sp.*z_sp , 2);
+            z_res = z - z_hat;
+            Py = mycov(w_sp,z_sp,z_hat);
             S_uwb = R_uwb + Py;
-            K_uwb = myxcov(w_sp,x_sp, uDCL_x_aa , h_sp,h_hat)/S_uwb;
+            K_uwb = myxcov(w_sp,x_sp, uDCL_x_aa , z_sp,z_hat)/S_uwb;
             uDCL_x_aa = uDCL_x_aa + K_uwb*z_res;
             Sigma_aa = Sigma_aa - K_uwb*Py*(K_uwb');
             Sigma_aa = 0.5*(Sigma_aa + Sigma_aa');
@@ -262,10 +251,16 @@ else
             uDCL_s(:,:,B(i,2),B(i,2),k) = Sigma_aa(idx2,idx2);
             uDCL_s(:,:,B(i,1),B(i,2),k) = Sigma_aa(idx1,idx2);
             uDCL_s(:,:,B(i,2),B(i,1),k) = eye(nx);
+
+
+            uDCL_x(:, B(i,1), k, t) = uDCL_x_aa(idx1);
+            uDCL_x(:, B(i,2), k, t) = uDCL_x_aa(idx2);
+            
+
          end
        end
        
-       clear z_x z_y z H h_hat R_uwb K_uwb i B h_x h_y z_res h_sp w_sp Py uDCL_x_aa Sigma_aa idx2 upd_idx
+       clear z_x z_y z H z_hat R_uwb K_uwb i B h_x h_y z_res z_sp w_sp Py uDCL_x_aa Sigma_aa idx2 upd_idx kappa
 
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%       
             for j3 = 1 : nCars

@@ -1,5 +1,5 @@
 nSims = 10^3;
-runtime =30 ;
+runtime =3 ; % usually 30
 SF = -0;
 sve = false;
 
