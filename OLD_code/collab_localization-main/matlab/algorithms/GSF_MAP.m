@@ -1,4 +1,5 @@
 if t == 1 %t scorre fino a nTicks
+debug_loglik = 0;
     GSF_MAP_x = zeros(6, nCars, nSims, nTicks);
     GSF_MAP_x(1:3,:,:,t) = repmat(x_truth(1:3,:,t), [1,1,nSims]);
     GSF_MAP_x(4,:,:,t)   = repmat(cos(x_truth(3,:,t)) .* x_truth(4,:,t), [1,1,nSims]);
@@ -10,7 +11,7 @@ if t == 1 %t scorre fino a nTicks
                     imu_gyr_err*imu_gyr_err/ rate_imu          ;...
                     imu_acc_err*imu_acc_err / rate_imu          ;...
                     imu_acc_err*imu_acc_err / rate_imu          ;...
-                    imu_gyr_err*imu_gyr_err]), [1,1,nCars,nSims]);
+                    imu_gyr_err*imu_gyr_err ]), [1,1,nCars,nSims]);
 
     nx = size(GSF_MAP_P(:,:,1,1) , 1);
     % I implement the GSF as a bank 3 EKFs. I need a data structure
@@ -20,34 +21,34 @@ if t == 1 %t scorre fino a nTicks
     weights = ones(nModes , nCars , nSims )/nModes;
     weights = log(weights);
 
-    EKF_x_gsf = zeros(6, nCars, nSims, nTicks);
-    EKF_x_gsf(1:3,:,:,t) = repmat(x_truth(1:3,:,t), [1,1,nSims]);
-    EKF_x_gsf(4,:,:,t)   = repmat(cos(x_truth(3,:,t)) .* x_truth(4,:,t), [1,1,nSims]);
-    EKF_x_gsf(5,:,:,t)   = repmat( sin(x_truth(3,:,t)) .* x_truth(4,:,t), [1,1,nSims]);
+    EKF_x_a = zeros(6, nCars, nSims, nTicks);
+    EKF_x_a(1:3,:,:,t) = repmat(x_truth(1:3,:,t), [1,1,nSims]);
+    EKF_x_a(4,:,:,t)   = repmat(cos(x_truth(3,:,t)) .* x_truth(4,:,t), [1,1,nSims]);
+    EKF_x_a(5,:,:,t)   = repmat( sin(x_truth(3,:,t)) .* x_truth(4,:,t), [1,1,nSims]);
     
-    EKF_P_gsf = repmat(... 
+    EKF_P_a = repmat(... 
             diag([  imu_acc_err*imu_acc_err / 2 / rate_imu^2    ;...
                     imu_acc_err*imu_acc_err/ 2 / rate_imu^2    ;...
                     imu_gyr_err*imu_gyr_err/ rate_imu          ;...
                     imu_acc_err*imu_acc_err / rate_imu          ;...
                     imu_acc_err*imu_acc_err / rate_imu          ;...
-                    imu_gyr_err*imu_gyr_err ]), [1,1,nCars,nSims]);
+                    imu_gyr_err*imu_gyr_err]), [1,1,nCars,nSims]);
     
               for j2 = 1 : nSims
                 for j1 = 1 : nCars
                     %Resymmetrize
-                    temp0 = EKF_P_gsf(:,:,j1,j2);
+                    temp0 = EKF_P(:,:,j1,j2);
                     temp0 = 0.5*(temp0 + temp0');
-                    EKF_P_gsf(:,:,j1,j2) = temp0;           
+                    EKF_P(:,:,j1,j2) = temp0;           
                 end
               end
               clear temp0
 
     GSF_MAP_struct = struct( "w" , weights, ... 
-                         "CA_x" , EKF_x_gsf , "CA_P" , EKF_P_gsf , ...
-                         "CT_x" , EKF_x_gsf , "CT_P" , EKF_P_gsf , ...
-                         "CV_x" , EKF_x_gsf , "CV_P" , EKF_P_gsf );
-clear EKF_x_gsf EKF_P_gsf
+                              "CA_x" , EKF_x_a , "CA_P" , EKF_P_a , ...
+                              "CT_x" , EKF_x_a , "CT_P" , EKF_P_a , ...
+                              "CV_x" , EKF_x_a , "CV_P" , EKF_P_a );
+clear EKF_P_a EKF_x_a
 
 
                 
@@ -92,13 +93,12 @@ else
                 GSF_MAP_struct.CA_x(5,:,:,t-1) + accel_r(2,:,:) * dt;...
                 gyro];
 
-        F_CA = [1,  0,  0, dt,  0,  0;...
-                0,  1,  0,  0, dt,  0 ;...
-                0,  0,  1,  0,  0, dt ;...
-                0,  0,  0,  1,  0,  0 ;...
-                0,  0,  0,  0,  1,  0 ;...
-                0,  0,  0,  0,  0,  1 ];
-
+             F_CA = [   1,  0,  0, dt,  0,  0 ;...
+                        0,  1,  0,  0, dt,  0 ;...
+                        0,  0,  1,  0,  0, dt ;...
+                        0,  0,  0,  1,  0,  0 ;...
+                        0,  0,  0,  0,  1,  0 ;...
+                        0,  0,  0,  0,  0,  1 ];
 
         % % Pagemtimes does matmult along the third dimension ( batch dimension )
         % Since its           
@@ -132,10 +132,10 @@ else
             GSF_MAP_struct.CT_x(5,:,:,t-1) + accel_r(2,:,:) * dt;...
             ct_zeroturn];
         
-        F_CT = [ 1,  0,  0, dt,  0,  0  ;...
-                0,  1,  0,  0, dt,  0  ;...
-                0,  0,  1,  0,  0, dt  ;...
-                0,  0,  0,  1,  0,  0  ;...
+        F_CT = [ 1,  0,  0, dt,  0,  0;...
+                 0,  1,  0,  0, dt,  0  ;...
+                0,  0,  1,  0,  0, dt ;...
+                0,  0,  0,  1,  0,  0 ;...
                 0,  0,  0,  0,  1,  0  ;...
                 0,  0,  0,  0,  0,  0 ];
 
@@ -170,12 +170,12 @@ else
           GSF_MAP_struct.CV_x(5,:,:,t-1) ;...
           gyro];
 
-        F_CV = [ 1,  0,  0, dt,  0,  0;...
-                0,  1,  0,  0, dt,  0  ;...
+        F_CV = [   1,  0,  0, dt,  0,  0  ;...
+                0,  1,  0,  0, dt,  0   ;...
                 0,  0,  1,  0,  0, dt  ;...
-                0,  0,  0,  1,  0,  0  ;...
-                0,  0,  0,  0,  1,  0  ;...
-                0,  0,  0,  0,  0,  1  ];
+                0,  0,  0,  1,  0,  0   ;...
+                0,  0,  0,  0,  1,  0   ;...
+                0,  0,  0,  0,  0,  1 ];
 
         GSF_MAP_struct.CV_P = pagemtimes(...
                     pagemtimes(...
@@ -195,33 +195,35 @@ else
 
     %%%%%%NEW MEAS%%%%%%%%%
     
-        z_vel = x_truth(4,:,t) + normrnd(0, enc_err, [1, nCars, nSims]); % Measures steering angle
-        z_del =  x_truth(4,:,t).*tan ( del(t,:) ) /wb + normrnd(0, imu_mag_err, [1, nCars, nSims]); 
+        z_vel = x_truth(4,:,t) + normrnd(0, enc_err, [1, nCars, nSims]);
+        z_del = x_truth(4,:,t).*tan( del(t,:) ) /wb + normrnd(0, imu_mag_err, [1, nCars, nSims]);
+        
         z = [   z_vel;...
-                z_del];
-%%%%%%%%%%%%%%%%%%%
-%Begin CA model
-        kf_vel = sqrt( GSF_MAP_struct.CA_x(4,:,:,t).^2 + GSF_MAP_struct.CA_x(5,:,:,t).^2 );
-        H = zeros(2,nx,nCars,nSims);
-        H(1,4,:,:) = GSF_MAP_struct.CA_x(4,:,:,t) ./ kf_vel;
-        H(1,5,:,:) = GSF_MAP_struct.CA_x(5,:,:,t) ./ kf_vel;
-        H(2,6,:,:) = 1;
-
-        h = [kf_vel; GSF_MAP_struct.CA_x(6,:,:,t)];
+                z_del ];
 
         R = zeros(2,2,nCars,nSims);
         R(1,1,:,:) = enc_err*enc_err;
-        R(2,2,:,:) = imu_mag_err*imu_mag_err;
+        R(2,2,:,:) = imu_mag_err*imu_mag_err ;
+
+%%%%%%%%%%%%%%%%%%%
+%Begin CA model
+        kf_vel = sqrt( GSF_MAP_struct.CA_x(4,:,:,t).^2 + GSF_MAP_struct.CA_x(5,:,:,t).^2 );
+        H = zeros(2,6,nCars,nSims);
+        H(1,4,:,:) = GSF_MAP_struct.CA_x(4,:,:,t) ./ kf_vel;
+        H(1,5,:,:) = GSF_MAP_struct.CA_x(5,:,:,t) ./ kf_vel;
+        H(2,6,:,:) = 1;
+        h = [kf_vel; GSF_MAP_struct.CA_x(6,:,:,t)];
         R_single = R(:,:,1,1);
 
 
         z_res = z - h;
         K = pageDiv( pagemtimes(GSF_MAP_struct.CA_P,'none',H,'transpose'), (pagemtimes( pagemtimes(H,GSF_MAP_struct.CA_P), 'none', H, 'transpose') + R));
-        GSF_MAP_struct.CA_x(:,:,:,t) = GSF_MAP_struct.CA_x(:,:,:,t) + reshape( pagemtimes( K, reshape((z_res), [2, 1, nCars, nSims])), [nx, nCars, nSims]);
-        GSF_MAP_struct.CA_P = pagemtimes( (repmat(eye(nx), [1,1,nCars,nSims]) - pagemtimes(K,H)), GSF_MAP_struct.CA_P);
+        GSF_MAP_struct.CA_x(:,:,:,t) = GSF_MAP_struct.CA_x(:,:,:,t) + reshape( pagemtimes( K, reshape((z_res), [2, 1, nCars, nSims])), [6, nCars, nSims]);
+        GSF_MAP_struct.CA_P = pagemtimes( (repmat(eye(6), [1,1,nCars,nSims]) - pagemtimes(K,H)), GSF_MAP_struct.CA_P);
 
        
           % End CA model
+if debug_loglik == 0
         % Begin pacmod CA weight update
             for j2 = 1 : nSims
                 for j1 = 1 : nCars
@@ -234,6 +236,7 @@ else
                      likCA = -0.5 * likCA;
                      GSF_MAP_struct.w(1 , j1 ,  j2 )= GSF_MAP_struct.w(1 , j1 ,  j2 ) + likCA ; 
                 end
+            end
 end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         % Begin CT model
@@ -247,9 +250,10 @@ end
 
         z_res = z - h;
         K = pageDiv( pagemtimes(GSF_MAP_struct.CT_P,'none',H,'transpose'), (pagemtimes( pagemtimes(H,GSF_MAP_struct.CT_P), 'none', H, 'transpose') + R));
-        GSF_MAP_struct.CT_x(:,:,:,t) = GSF_MAP_struct.CT_x(:,:,:,t) + reshape( pagemtimes( K, reshape((z_res), [2, 1, nCars, nSims])), [nx, nCars, nSims]);
-        GSF_MAP_struct.CT_P = pagemtimes( (repmat(eye(nx), [1,1,nCars,nSims]) - pagemtimes(K,H)), GSF_MAP_struct.CT_P);
+        GSF_MAP_struct.CT_x(:,:,:,t) = GSF_MAP_struct.CT_x(:,:,:,t) + reshape( pagemtimes( K, reshape((z_res), [2, 1, nCars, nSims])), [6, nCars, nSims]);
+        GSF_MAP_struct.CT_P = pagemtimes( (repmat(eye(6), [1,1,nCars,nSims]) - pagemtimes(K,H)), GSF_MAP_struct.CT_P);
         % End CT model
+if debug_loglik == 0
         % Begin pacmod CT weight update
             for j2 = 1 : nSims
                 for j1 = 1 : nCars
@@ -263,6 +267,7 @@ end
                      likCT = -0.5 * likCT;
                      GSF_MAP_struct.w(2 , j1 ,  j2 )= GSF_MAP_struct.w(2 , j1 ,  j2 ) +  likCT ; 
                 end
+            end
  end
         % End CT weight update
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -278,9 +283,10 @@ end
         
         z_res = z - h;
         K = pageDiv( pagemtimes(GSF_MAP_struct.CV_P,'none',H,'transpose'), (pagemtimes( pagemtimes(H,GSF_MAP_struct.CV_P), 'none', H, 'transpose') + R));
-        GSF_MAP_struct.CV_x(:,:,:,t) = GSF_MAP_struct.CV_x(:,:,:,t) + reshape( pagemtimes( K, reshape((z_res), [2, 1, nCars, nSims])), [nx, nCars, nSims]);
-        GSF_MAP_struct.CV_P = pagemtimes( (repmat(eye(nx), [1,1,nCars,nSims]) - pagemtimes(K,H)), GSF_MAP_struct.CV_P);
+        GSF_MAP_struct.CV_x(:,:,:,t) = GSF_MAP_struct.CV_x(:,:,:,t) + reshape( pagemtimes( K, reshape((z_res), [2, 1, nCars, nSims])), [6, nCars, nSims]);
+        GSF_MAP_struct.CV_P = pagemtimes( (repmat(eye(6), [1,1,nCars,nSims]) - pagemtimes(K,H)), GSF_MAP_struct.CV_P);
         % End CV Model
+ if debug_loglik == 0
    
         %Begin pacmod CV weighht update
             for j2 = 1 : nSims
@@ -295,20 +301,11 @@ end
                      likCV = -0.5 * likCV;
                      GSF_MAP_struct.w(3 , j1 ,  j2 )= GSF_MAP_struct.w(3 , j1 ,  j2 ) + likCV ; 
                 end
+            end
  end
         % End cv weight updatee
         
-        clear z_vel z_del z kf_vel H h  K likCA likCT likCV quadform
-
-
-        %Normalize log weights
- for j2 = 1 : nSims
-    for j1 = 1 : nCars
-        GSF_MAP_struct.w(:,j1,j2) = normalizeLogWeights(GSF_MAP_struct.w(:,j1,j2));
-    end
- end
-
-
+        clear z_vel z_del z kf_vel H h  K likCA likCT likCV
     end
 
     % GNSS step at 10 Hz
@@ -345,10 +342,11 @@ end
         z_res = z - h ;
         K = pageDiv( pagemtimes(GSF_MAP_struct.CA_P,'none',H,'transpose'), ( pagemtimes( pagemtimes( H, GSF_MAP_struct.CA_P), 'none', H, 'transpose') + R ) );
 
-        GSF_MAP_struct.CA_x(:,:,:,t) = GSF_MAP_struct.CA_x(:,:,:,t) + reshape( pagemtimes( K, reshape(z_res, [4, 1, nCars, nSims])), [nx, nCars, nSims] );
-        GSF_MAP_struct.CA_P = pagemtimes( ( repmat( eye(nx), [1,1,nCars,nSims] ) - pagemtimes(K,H) ), GSF_MAP_struct.CA_P );
+        GSF_MAP_struct.CA_x(:,:,:,t) = GSF_MAP_struct.CA_x(:,:,:,t) + reshape( pagemtimes( K, reshape(z_res, [4, 1, nCars, nSims])), [6, nCars, nSims] );
+        GSF_MAP_struct.CA_P = pagemtimes( ( repmat( eye(6), [1,1,nCars,nSims] ) - pagemtimes(K,H) ), GSF_MAP_struct.CA_P );
         % End CA model
 
+  if debug_loglik == 0
 
         % Begin GNSS CA weight update
             for j2 = 1 : nSims
@@ -365,6 +363,7 @@ end
                      likCA = -0.5 * likCA;
                      GSF_MAP_struct.w(1 , j1 ,  j2 )= GSF_MAP_struct.w(1 , j1 ,  j2 ) + likCA ; 
                 end
+            end
 end
 
 
@@ -381,10 +380,11 @@ end
         
         z_res = z - h;
         K = pageDiv( pagemtimes(GSF_MAP_struct.CT_P,'none',H,'transpose'), ( pagemtimes( pagemtimes( H, GSF_MAP_struct.CT_P), 'none', H, 'transpose') + R ) );
-        GSF_MAP_struct.CT_x(:,:,:,t) = GSF_MAP_struct.CT_x(:,:,:,t) + reshape( pagemtimes( K, reshape(z_res, [4, 1, nCars, nSims])), [nx, nCars, nSims] );
-        GSF_MAP_struct.CT_P = pagemtimes( ( repmat( eye(nx), [1,1,nCars,nSims] ) - pagemtimes(K,H) ), GSF_MAP_struct.CT_P );
+        GSF_MAP_struct.CT_x(:,:,:,t) = GSF_MAP_struct.CT_x(:,:,:,t) + reshape( pagemtimes( K, reshape(z_res, [4, 1, nCars, nSims])), [6, nCars, nSims] );
+        GSF_MAP_struct.CT_P = pagemtimes( ( repmat( eye(6), [1,1,nCars,nSims] ) - pagemtimes(K,H) ), GSF_MAP_struct.CT_P );
 
         % End CT model
+if debug_loglik == 0
 
         % Begin GNSS CT weight update
             for j2 = 1 : nSims
@@ -399,7 +399,7 @@ end
                      likCT = -0.5 * likCT;
                      GSF_MAP_struct.w(2 , j1 ,  j2 )= GSF_MAP_struct.w(2 , j1 ,  j2 ) + likCT ; 
                 end
-            
+            end
 end
         % End CT weight update 
 
@@ -419,9 +419,10 @@ end
 
         z_res = z - h;
         K = pageDiv( pagemtimes(GSF_MAP_struct.CV_P,'none',H,'transpose'), ( pagemtimes( pagemtimes( H, GSF_MAP_struct.CV_P), 'none', H, 'transpose') + R ) );
-        GSF_MAP_struct.CV_x(:,:,:,t) = GSF_MAP_struct.CV_x(:,:,:,t) + reshape( pagemtimes( K, reshape(z_res, [4, 1, nCars, nSims])), [nx, nCars, nSims] );
-        GSF_MAP_struct.CV_P = pagemtimes( ( repmat( eye(nx), [1,1,nCars,nSims] ) - pagemtimes(K,H) ), GSF_MAP_struct.CV_P );
+        GSF_MAP_struct.CV_x(:,:,:,t) = GSF_MAP_struct.CV_x(:,:,:,t) + reshape( pagemtimes( K, reshape(z_res, [4, 1, nCars, nSims])), [6, nCars, nSims] );
+        GSF_MAP_struct.CV_P = pagemtimes( ( repmat( eye(6), [1,1,nCars,nSims] ) - pagemtimes(K,H) ), GSF_MAP_struct.CV_P );
         % End CV model
+if debug_loglik == 0
 
         % Begin GNSS CV weight update
             for j2 = 1 : nSims
@@ -438,21 +439,15 @@ end
                      likCV = -0.5 * likCV;
                      GSF_MAP_struct.w(3 , j1 ,  j2 )= GSF_MAP_struct.w(3 , j1 ,  j2 ) + likCV ; 
                 end
-            
+            end
 end
         % End CV  weight update
   
         
         
-        clear z_vel z_del z kf_vel H h  K likCA likCT likCV quadform
-        %Normalize log weights
- for j2 = 1 : nSims
-    for j1 = 1 : nCars
-        GSF_MAP_struct.w(:,j1,j2) = normalizeLogWeights(GSF_MAP_struct.w(:,j1,j2));
-    end
- end
+        clear z_vel z_del z kf_vel H h  K likCA likCT likCV
 
- end
+    end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -460,6 +455,13 @@ end
 
 
 %Begin Fusion of hypotheses
+
+%Normalize log weights
+ for j2 = 1 : nSims
+    for j1 = 1 : nCars
+        GSF_MAP_struct.w(:,j1,j2) = normalizeLogWeights(GSF_MAP_struct.w(:,j1,j2));
+    end
+ end
 
 GSF_MAP_struct.w = exp(GSF_MAP_struct.w);
 % Begin MAP
@@ -495,6 +497,24 @@ for j2 = 1 : nSims
 end
 
 % %End of MAP
+
+
+
+
+%%% Prune all other hypos %%%%%
+    for j2 = 1 : nSims
+        for j1 = 1 : nCars
+        x_mean = GSF_MAP_x(:,j1,j2,t);
+        GSF_MAP_struct.CA_x(:,j1,j2,t) = x_mean ;
+        GSF_MAP_struct.CT_x(:,j1,j2,t) = x_mean ;
+        GSF_MAP_struct.CV_x(:,j1,j2,t) = x_mean  ;
+
+       GSF_MAP_struct.CA_P(:,:,j1,j2) = GSF_MAP_P(:,:,j1,j2) ;
+       GSF_MAP_struct.CT_P(:,:,j1,j2) = GSF_MAP_P(:,:,j1,j2);
+       GSF_MAP_struct.CV_P(:,:,j1,j2) = GSF_MAP_P(:,:,j1,j2);
+        end
+    end
+
 
 GSF_MAP_struct.w = log( GSF_MAP_struct.w);
 

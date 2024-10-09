@@ -4,7 +4,10 @@
 % x(2) : y position
 % x(3) : orientation
 % x(4) : velocity
-%
+
+
+
+
 
 if t == 1
     x_truth = zeros(4,nCars,nTicks);

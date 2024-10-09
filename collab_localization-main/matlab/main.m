@@ -1,29 +1,29 @@
-clear; clc; close all
-rng(42)
-
-warning('off', 'all');
-
-
+clear; clc; 
+warning('all','off');
 addpath('algorithms');
 addpath('input');
 addpath('output');
 addpath('src');
-%%
+rng(42)
+nSims = 10^3;
+runtime = 10;
+SF = -0;
+sve = false;
 
-par;   
-%%% Elapsed time is 1429.983475 seconds. ca 23 minuti
+sensors = [true, true, true];
 
-%%
-tic
-for t=1:length(ticks)
+par;
+preprocessor;
+nTicks
+tic 
+for t=1:nTicks
     t
     Truth;
     EKF;
-    uDCL;
     GSF_MAP;
+    DCL;
 end
 toc
-%%
+
+postprocessor;
 postplot;
-
-
